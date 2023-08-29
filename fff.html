@@ -1,0 +1,219 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Prediction of Freezing of Gait</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background-image: url('https://images.rawpixel.com/image_800/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvdjMzMy1uaW5nLTUwYS1tZWRpY2FsXzIuanBn.jpg');
+            background-size: cover;
+        }
+
+        .chart-container {
+            margin-top: 30px;
+            height: 400px;
+            overflow: auto;
+        }
+
+        canvas {
+            display: block;
+            max-width: 100%;
+        }
+
+        #side-window {
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: 200px;
+            height: 50%;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            overflow-y: auto;
+            transition: right 0.3s ease-in-out;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #predictButton {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s, transform 0.1s;
+            margin-top: 10px;
+        }
+
+        #predictButton:hover {
+            background-color: #007BFF;
+            transform: scale(1.05);
+        }
+
+        #model-selection label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        #model-selection select {
+            width: 25%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        #info-button {
+            position: fixed;
+            right: 20px;
+            top: 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            padding: 5px 10px;
+        }
+
+        #fancy-title {
+            text-align: center;
+            font-size: 36px;
+            font-weight: bold;
+            color: #333;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Rest of your styles here */
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1 id="fancy-title">Detection of FOG in Parkinson's Disease using Supervise Learning</h1>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div>
+                <label for="csvFileInput">Choose CSV File:</label>
+                <input type="file" name="file" id="csvFileInput">
+            </div>
+            <div id="model-selection">
+                <label for="model">Select Model:</label>
+                <select id="model" name="model">
+                    <option value="home">Home Model</option>
+                    <option value="lab">Lab Model</option>
+                </select>
+            </div>
+            <button id="predictButton" type="button">Predict and Display</button>
+        </form>
+        <div class="chart-container">
+            <canvas id="combinedChart"></canvas>
+        </div>
+    </div>
+
+    <div id="side-window">
+        <p>Additional Information:</p>
+        <p>Accv - Acceleration in V (Vertical)</p>
+        <p>AccML - Acceleration in ML (Medio-Lateral) Direction</p>
+        <p>AccAP - Acceleration in AP (Antero-Posterior) Direction</p>
+        <p>predicted Value : 0 means Gait not occur / 1 means Gait occur</p>
+    </div>
+
+    <button id="info-button">Info</button>
+
+    <script>
+        const infoButton = document.getElementById('info-button');
+        const sideWindow = document.getElementById('side-window');
+        infoButton.addEventListener('click', () => {
+            const isOpen = sideWindow.style.right === '0px';
+            sideWindow.style.right = isOpen ? '-200px' : '0px';
+        });
+
+        const predictButton = document.getElementById('predictButton');
+        const fileInput = document.getElementById('csvFileInput');
+        const combinedChart = document.getElementById('combinedChart');
+
+        predictButton.addEventListener('click', () => {
+            const selectedFile = fileInput.files[0];
+            if (!selectedFile) {
+                alert('Please select a CSV file.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            const modelSelect = document.getElementById('model');
+            const selectedModel = modelSelect.value;
+
+            formData.append('model', selectedModel);
+
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const ctxCombined = combinedChart.getContext('2d');
+                new Chart(ctxCombined, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [
+                            {
+                                label: 'Predicted Values',
+                                data: data.predicted_values,
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                fill: false
+                            },
+                            {
+                                label: 'AccV',
+                                data: data.x_values.AccV,
+                                borderColor: 'rgba(255, 0, 0, 1)',
+                                fill: false
+                            },
+                            {
+                                label: 'AccML',
+                                data: data.x_values.AccML,
+                                borderColor: 'rgba(0, 255, 0, 1)',
+                                fill: false
+                            },
+                            {
+                                label: 'AccAP',
+                                data: data.x_values.AccAP,
+                                borderColor: 'rgba(0, 0, 255, 1)',
+                                fill: false
+                            }
+                        ]
+                    },
+                    options: {
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Data of 24 hrs'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Prediction of Gait occurence'
+                                }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('An error occurred:', error);
+            });
+        });
+    </script>
+</body>
+</html>
+
+
+
+
